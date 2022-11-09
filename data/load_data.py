@@ -42,7 +42,7 @@ def split_tasks(g, features, labels, device = 'cuda:0', num_task = 5, shuffle = 
         taskcla.append((task,selected_cls.size()[0],sub_feat[train_mask].size()[0]))
     return data, taskcla, features.size()[1]
 
-def generate_mask(labels, split = [0.6,0.1,0.3]):
+def generate_mask(labels, split = [0.2,0.1,0.7]):
     idx = np.arange(labels.size()[0])
     idx_train_and_val, idx_test = train_test_split(idx,
                                                    random_state=None,

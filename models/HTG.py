@@ -55,31 +55,36 @@ class NodeAttention(nn.Module):
         return self.semantic_attention(semantic_embeddings)                            # (N, D * K)
 
 class NET(nn.Module):
-    def __init__(self, meta_paths, in_size, hidden_size, out_size, num_heads, dropout):
+    def __init__(self,
+                 meta_paths,
+                 in_size,
+                 n_class = None,
+                 hidden_size = 16,
+                 num_layers = 2,
+                 num_heads = 8,
+                 dropout = 0.6):
         super(NET, self).__init__()
 
         self.layers = nn.ModuleList()
-        self.layers.append(NodeAttention(meta_paths, in_size, hidden_size, num_heads[0], dropout))
-        for l in range(1, len(num_heads)):
-            self.layers.append(NodeAttention(meta_paths, hidden_size * num_heads[l-1],
-                                        hidden_size, num_heads[l], dropout))
-        self.predict = nn.Linear(hidden_size * num_heads[-1], out_size)
+        self.layers.append(NodeAttention(meta_paths, in_size, hidden_size, num_heads, dropout))
+        for l in range(1, num_layers):
+            self.layers.append(NodeAttention(meta_paths, hidden_size * num_heads,
+                                        hidden_size, num_heads, dropout))
+        self.predict = None
+        if n_class is not None:
+            self.predict = torch.nn.Linear(hidden_size * num_heads, n_class)
 
     def forward(self, g, h):
         for gnn in self.layers:
             h = gnn(g, h)
+        return h if self.predict is None else self.predict(h)
 
-        return self.predict(h)
-
-    def get_embeddings(self, g, h):
-        for gnn in self.layers:
-            h = gnn(g, h)
-
-        return h
-    
-    def get_attentions(self, g, h):
+    def get_embeddings(self, g, h, get_attention = False):
         attentions = []
         for gnn in self.layers:
-            h, a = gnn(g, h, True)
-            attentions.append(a)
-        return h, attentions
+            if get_attention:
+                h, a = gnn(g, h, True)
+                attentions.append(a)
+            else:
+                h = gnn(g, h)
+        return h, attentions if get_attention else h

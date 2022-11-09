@@ -42,11 +42,6 @@ class Manager(torch.nn.Module):
                 print()
                 print('Val, Epoch:{}, Loss:{}, ACC:{}, Micro-F1:{}, Macro-F1:{}'.format(epoch, loss.item(), acc, mif1, maf1))
 
-        fisher, params = self.calculate_fisher(g, features, task, labels, train_mask)
-        self.current_task = task
-        self.fisher[self.current_task] = fisher
-        self.params[self.current_task] = params
-
     def batch_train_with_eval(self, dataloader, g, features, task, labels, train_mask, val_mask, args):
         self.train()
 
@@ -62,11 +57,6 @@ class Manager(torch.nn.Module):
                 acc, mif1, maf1 = self.evaluation(g, features, task, labels, val_mask)
                 print()
                 print('Val, Epoch:{}, Loss:{}, ACC:{}, Micro-F1:{}, Macro-F1:{}'.format(epoch, loss.item(), acc, mif1, maf1))
-
-        fisher, params = self.calculate_fisher(g, features, task, labels, train_mask)
-        self.current_task = task
-        self.fisher[self.current_task] = fisher
-        self.params[self.current_task] = params
 
     @torch.no_grad()
     def evaluation(self, g, features, task, labels, val_mask):
