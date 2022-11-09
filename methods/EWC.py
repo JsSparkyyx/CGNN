@@ -17,17 +17,24 @@ class Manager(torch.nn.Module):
         self.params = {}
         self.lamb_full = args.ewc_lamb_full
         self.lamb_mini = args.ewc_lamb_mini
+        self.class_incremental = args.class_incremental
 
-        self.predict = torch.nn.ModuleList()
-        for task, n_class, _ in taskcla:
-            self.predict.append(torch.nn.Linear(in_feat,n_class))
+        if self.class_incremental:
+            self.predict = torch.nn.ModuleList()
+            for task, n_class, _ in taskcla:
+                self.predict.append(torch.nn.Linear(in_feat,n_class))
+        else:
+            self.predict = torch.nn.Linear(in_feat,taskcla)
 
         self.ce = torch.nn.CrossEntropyLoss()
         self.opt = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay)
     
     def forward(self, g, features, task, mini_batch = False):
         h = self.arch(g, features, mini_batch)
-        logits = self.predict[task](h)
+        if self.class_incremental:
+            logits = self.predict[task](h)
+        else:
+            logits = self.predict(h)
 
         return logits
 

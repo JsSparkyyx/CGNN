@@ -60,6 +60,10 @@ if __name__ == '__main__':
     # torch.cuda.set_device(args.gpu_id)
     args.device = 'cuda:{}'.format(str(args.gpu_id)) if torch.cuda.is_available() else 'cpu'
     args.fanouts = [int(i) for i in args.fanouts.split(',')]
+    if args.dataset == 'cfd':
+        args.class_incremental = False
+    else:
+        args.class_incremental = True
     set_seed(args.seed)
 
     main(args)

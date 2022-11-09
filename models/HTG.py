@@ -5,13 +5,13 @@ import dgl
 from dgl.nn.pytorch import GATConv
 
 class SemanticAttention(nn.Module):
-    def __init__(self, in_size, hidden_size=128):
+    def __init__(self, in_size, num_hidden=128):
         super(SemanticAttention, self).__init__()
 
         self.project = nn.Sequential(
-            nn.Linear(in_size, hidden_size),
+            nn.Linear(in_size, num_hidden),
             nn.Tanh(),
-            nn.Linear(hidden_size, 1, bias=False)
+            nn.Linear(num_hidden, 1, bias=False)
         )
 
     def forward(self, z):
@@ -22,16 +22,16 @@ class SemanticAttention(nn.Module):
         return (beta * z).sum(1)                       # (N, D * K)
 
 class NodeAttention(nn.Module):
-    def __init__(self, meta_paths, in_size, out_size, layer_num_heads, dropout):
+    def __init__(self, meta_paths, in_size, out_size, layer_heads, dropout):
         super(NodeAttention, self).__init__()
 
         # One GAT layer for each meta path based adjacency matrix
         self.gat_layers = nn.ModuleList()
         for i in range(len(meta_paths)):
-            self.gat_layers.append(GATConv(in_size, out_size, layer_num_heads,
+            self.gat_layers.append(GATConv(in_size, out_size, layer_heads,
                                            dropout, dropout, activation=F.elu,
                                            allow_zero_in_degree=True))
-        self.semantic_attention = SemanticAttention(in_size=out_size * layer_num_heads)
+        self.semantic_attention = SemanticAttention(in_size=out_size * layer_heads)
         self.meta_paths = list(tuple(meta_path) for meta_path in meta_paths)
 
         self._cached_graph = None
@@ -59,27 +59,27 @@ class NET(nn.Module):
                  meta_paths,
                  in_size,
                  n_class = None,
-                 hidden_size = 16,
+                 num_hidden = 16,
                  num_layers = 2,
-                 num_heads = 8,
+                 heads = 8,
                  dropout = 0.6):
         super(NET, self).__init__()
 
         self.layers = nn.ModuleList()
-        self.layers.append(NodeAttention(meta_paths, in_size, hidden_size, num_heads, dropout))
+        self.layers.append(NodeAttention(meta_paths, in_size, num_hidden, heads, dropout))
         for l in range(1, num_layers):
-            self.layers.append(NodeAttention(meta_paths, hidden_size * num_heads,
-                                        hidden_size, num_heads, dropout))
+            self.layers.append(NodeAttention(meta_paths, num_hidden * heads,
+                                        num_hidden, heads, dropout))
         self.predict = None
         if n_class is not None:
-            self.predict = torch.nn.Linear(hidden_size * num_heads, n_class)
+            self.predict = torch.nn.Linear(num_hidden * heads, n_class)
 
-    def forward(self, g, h):
+    def forward(self, g, h, mini_batch = False, edge_weight = None):
         for gnn in self.layers:
             h = gnn(g, h)
         return h if self.predict is None else self.predict(h)
 
-    def get_embeddings(self, g, h, get_attention = False):
+    def get_embeddings(self, g, h, mini_batch = False, get_attention = False):
         attentions = []
         for gnn in self.layers:
             if get_attention:

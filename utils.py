@@ -89,6 +89,7 @@ def save_results(results,args):
     path = os.path.join(args.save_path,args.dataset) + '/' + args.arch+'_'+args.method+'_'+str(args.num_tasks)+'_'+ args.manner +'_overall' + '.csv'
     with open(path, 'a') as f:
         f.write("{:.2f},{:.2f},{:.2f},{}\n".format(round(ACC,2),round(FM,2),round(LA,2),args.seed))
+    print("{:.2f},{:.2f},{:.2f},{}\n".format(round(ACC,2),round(FM,2),round(LA,2),args.seed))
 
 
 

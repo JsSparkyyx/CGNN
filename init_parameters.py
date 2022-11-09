@@ -2,7 +2,7 @@ import argparse
 
 def init_parameters():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', type=str, choices=['cora','amazon','reddit'], default='cora')
+    parser.add_argument('--dataset', type=str, choices=['cora','amazon','reddit','cfd'], default='cora')
     parser.add_argument('--arch', '--architecture', type=str, choices=['HTG','GAT','GCN','SAGE'], default='GAT')
     parser.add_argument('--manner', type=str, choices=['full_batch','mini_batch'], default='mini_batch')
     parser.add_argument('--method', type=str, choices=['Finetune','CR','EWC','HAT','GEM','MAS'], default='CR')
@@ -24,6 +24,11 @@ def init_parameters():
     parser.add_argument('--data_epoch', type=int, default=10)
     parser.add_argument('--arch_epoch', type=int, default=1)
     parser.add_argument('--reduction_rate', type=float, default=0.01)
+
+    # parameters for HTG
+    parser.add_argument('--htg_layer', type=int, default=2)
+    parser.add_argument('--htg_head', type=int, default=8)
+    parser.add_argument('--htg_hidden', type=int, default=32)
 
     # parameters for GAT
     parser.add_argument('--gat_layer', type=int, default=2)

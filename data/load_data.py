@@ -1,6 +1,7 @@
 import torch
 import dgl
 import numpy as np
+import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 import random
@@ -13,6 +14,8 @@ def load_dataset(dataset, device = 'cuda:0'):
         g, features, labels = load_cora()
     elif dataset == 'amazon':
         g, features, labels = load_amazon()
+    elif dataset == 'cfd':
+        return load_cfd()
     else:
         raise(dataset + ' not supported.')
     data = split_tasks(g, features, labels, device)
@@ -42,7 +45,7 @@ def split_tasks(g, features, labels, device = 'cuda:0', num_task = 5, shuffle = 
         taskcla.append((task,selected_cls.size()[0],sub_feat[train_mask].size()[0]))
     return data, taskcla, features.size()[1]
 
-def generate_mask(labels, split = [0.2,0.1,0.7]):
+def generate_mask(labels, split = [0.3,0.1,0.6]):
     idx = np.arange(labels.size()[0])
     idx_train_and_val, idx_test = train_test_split(idx,
                                                    random_state=None,
@@ -92,7 +95,69 @@ def load_reddit():
     
     return g, features, labels
 
+def load_cfd(device = 'cuda:0', shuffle = True):
+    import pickle
+    path = './datasets/cfd'
+    regions = pickle.load(open(path+'/data.pickle','rb'))
+    data = []
+    indexes = list(regions.keys())
+    if shuffle:
+        random.shuffle(indexes)
+    for task, index in enumerate(indexes):
+        region = regions[index]
+        card2idx = {}
+        for i, name in enumerate(region['cc_num'].unique()):
+            card2idx[name] = i
+        merch2idx = {}
+        for i, name in enumerate(region['merchant'].unique()):
+            merch2idx[name] = i
+            
+        g = dgl.heterograph({
+            ('transaction', 'tc', 'card'): (np.array(region['trans_num']), np.array([card2idx[i] for i in region['cc_num']])),
+            ('card', 'ct', 'transaction'): (np.array([card2idx[i] for i in region['cc_num']]), np.array(region['trans_num'])),
+            ('transaction', 'tm', 'merchant'): (np.array(region['trans_num']), np.array(region['merchant_id'])),
+            ('merchant', 'mt', 'transaction'): (np.array(region['merchant_id']), np.array(region['trans_num'])),
+            ('transaction', 'th', 'hour'): (np.array(region['trans_num']), np.array(region['trans_date_trans_time'])),
+            ('hour', 'ht', 'transaction'): (np.array(region['trans_date_trans_time']), np.array(region['trans_num']))
+        })
+        
+        transaction = region[['trans_num', 'trans_date_trans_time', 'amt',
+                                'lat', 'long', 'city_pop', 'merch_lat', 'merch_long', 'category']]
+        transaction_dummies = pd.get_dummies(transaction.drop_duplicates(
+        )[['trans_date_trans_time', 'amt', 'lat', 'long', 'city_pop', 'merch_lat', 'merch_long', 'category']])
+        features = np.array(transaction_dummies)
+        features -= np.mean(features, axis=0)
+        features /= np.std(features, axis=0)
+        features = torch.FloatTensor(features)
+        labels = np.array(region['is_fraud'])
+        labels = torch.LongTensor(labels)
 
+        def get_binary_mask(total_size, indices):
+            mask = torch.zeros(total_size)
+            mask[indices] = 1
+            return mask.bool()
+        label_ids = [0, 1]
+        float_mask = np.zeros(len(labels))
+        for label_id in label_ids:
+            label_mask = (labels == label_id)
+            float_mask[label_mask] = np.random.permutation(np.linspace(0, 1, label_mask.sum()))
+        train_idx = np.where(float_mask <= 0.2)[0]
+        val_idx = np.where((float_mask > 0.2) & (float_mask <= 0.3))[0]
+        test_idx = np.where(float_mask > 0.3)[0]
+        num_nodes = labels.shape[0]
+        train_mask = get_binary_mask(num_nodes, train_idx)
+        val_mask = get_binary_mask(num_nodes, val_idx)
+        test_mask = get_binary_mask(num_nodes, test_idx)
+
+        train_idx = torch.nonzero(train_mask)
+        val_idx = torch.nonzero(val_mask)
+        test_idx = torch.nonzero(test_mask)
+        num_nodes = labels.shape[0]
+        train_mask = get_binary_mask(num_nodes, train_idx)
+        val_mask = get_binary_mask(num_nodes, val_idx)
+        test_mask = get_binary_mask(num_nodes, test_idx)
+        data.append(GraphData(g, features, labels, labels, train_mask, val_mask, test_mask, device))
+    return (data, [['tc', 'ct'], ['th', 'ht'], ['tm', 'mt']]), 2, features.shape[1]
         
 # g, features, labels = load_cora()
 # data, taskcla, in_feat = split_tasks(g, features, labels)
