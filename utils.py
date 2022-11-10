@@ -93,139 +93,139 @@ def save_results(results,args):
 
 
 
-import os.path as osp
-import scipy.sparse as sp
-import torch_geometric.transforms as T
-from deeprobust.graph.data import Dataset
-from deeprobust.graph.utils import get_train_val_test
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from deeprobust.graph.utils import *
-from torch_geometric.data import NeighborSampler, Data
-from torch_geometric.utils import to_undirected, subgraph
-from torch_geometric.datasets import CoraFull, Reddit
-import random
+# import os.path as osp
+# import scipy.sparse as sp
+# import torch_geometric.transforms as T
+# from deeprobust.graph.data import Dataset
+# from deeprobust.graph.utils import get_train_val_test
+# from sklearn.model_selection import train_test_split
+# from sklearn.preprocessing import StandardScaler, LabelEncoder
+# from deeprobust.graph.utils import *
+# from torch_geometric.data import NeighborSampler, Data
+# from torch_geometric.utils import to_undirected, subgraph
+# from torch_geometric.datasets import CoraFull, Reddit
+# import random
 
-def load_cora(name, normalize_features=False, transform=None, if_dpr=True, shuffle = True):
-    path = osp.join(osp.dirname(osp.realpath(__file__)), 'data', name)
-    dataset = CoraFull(path)
+# def load_cora(name, normalize_features=False, transform=None, if_dpr=True, shuffle = True):
+#     path = osp.join(osp.dirname(osp.realpath(__file__)), 'data', name)
+#     dataset = CoraFull(path)
 
-    dataset = dataset[0]
-    labels = dataset.y
-    features = dataset.x
-    scaler = StandardScaler()
-    scaler.fit(features)
-    features = torch.tensor(scaler.transform(features))
-    num_cls = np.unique(labels).shape[0]
-    cls_idx = np.arange(num_cls)
-    if shuffle:
-        random.shuffle(cls_idx)
-    cls_idx = torch.LongTensor(cls_idx)
-    pyg_data = []
-    dpr_data = []
-    taskcla = []
-    num_task = 5
-    for task in range(num_task):
-        selected_cls = cls_idx[task*(num_cls//num_task):(task+1)*(num_cls//num_task)]
-        condition = torch.BoolTensor([i in selected_cls for i in labels])
-        selected_mask = torch.where(condition, torch.tensor(1), torch.tensor(0)).bool()
-        edge_index, _ = subgraph(selected_mask, dataset.edge_index, relabel_nodes = True)
-        le = LabelEncoder()
-        le.fit(labels[selected_mask])
-        encoded_cls = torch.LongTensor(le.transform(labels[selected_mask]))
-        data = Data(x = features[selected_mask], edge_index = edge_index, y = encoded_cls)
-        pyg_data.append(data)
-        dpr_data.append(Pyg2Dpr(data))
-        taskcla.append((task,selected_cls.size()[0]))
-    return dpr_data, pyg_data, taskcla
+#     dataset = dataset[0]
+#     labels = dataset.y
+#     features = dataset.x
+#     scaler = StandardScaler()
+#     scaler.fit(features)
+#     features = torch.tensor(scaler.transform(features))
+#     num_cls = np.unique(labels).shape[0]
+#     cls_idx = np.arange(num_cls)
+#     if shuffle:
+#         random.shuffle(cls_idx)
+#     cls_idx = torch.LongTensor(cls_idx)
+#     pyg_data = []
+#     dpr_data = []
+#     taskcla = []
+#     num_task = 5
+#     for task in range(num_task):
+#         selected_cls = cls_idx[task*(num_cls//num_task):(task+1)*(num_cls//num_task)]
+#         condition = torch.BoolTensor([i in selected_cls for i in labels])
+#         selected_mask = torch.where(condition, torch.tensor(1), torch.tensor(0)).bool()
+#         edge_index, _ = subgraph(selected_mask, dataset.edge_index, relabel_nodes = True)
+#         le = LabelEncoder()
+#         le.fit(labels[selected_mask])
+#         encoded_cls = torch.LongTensor(le.transform(labels[selected_mask]))
+#         data = Data(x = features[selected_mask], edge_index = edge_index, y = encoded_cls)
+#         pyg_data.append(data)
+#         dpr_data.append(Pyg2Dpr(data))
+#         taskcla.append((task,selected_cls.size()[0]))
+#     return dpr_data, pyg_data, taskcla
 
-def load_reddit(name, normalize_features=True, transform=None, if_dpr=True, shuffle = True):
-    path = osp.join(osp.dirname(osp.realpath(__file__)), 'data', name)
-    dataset = Reddit(path)
+# def load_reddit(name, normalize_features=True, transform=None, if_dpr=True, shuffle = True):
+#     path = osp.join(osp.dirname(osp.realpath(__file__)), 'data', name)
+#     dataset = Reddit(path)
 
-    dataset = dataset[0]
-    labels = dataset.y
-    features = dataset.x
-    scaler = StandardScaler()
-    scaler.fit(features)
-    features = torch.tensor(scaler.transform(features))
-    num_cls = np.unique(labels).shape[0]
-    cls_idx = np.arange(num_cls)
-    if shuffle:
-        random.shuffle(cls_idx)
-    cls_idx = torch.LongTensor(cls_idx)
-    pyg_data = []
-    dpr_data = []
-    taskcla = []
-    num_task = 5
-    for task in range(num_task):
-        selected_cls = cls_idx[task*(num_cls//num_task):(task+1)*(num_cls//num_task)]
-        condition = torch.BoolTensor([i in selected_cls for i in labels])
-        selected_mask = torch.where(condition, torch.tensor(1), torch.tensor(0)).bool()
-        edge_index, _ = subgraph(selected_mask, dataset.edge_index, relabel_nodes = True)
-        # print(selected_mask)
-        # print(selected_mask.nonzero().flatten().size())
-        # print(edge_index)
-        le = LabelEncoder()
-        le.fit(labels[selected_mask])
-        encoded_cls = torch.LongTensor(le.transform(labels[selected_mask]))
-        # print(encoded_cls)
-        # print(encoded_cls.size())
-        # print(features[selected_mask].size())
-        data = Data(x = features[selected_mask], edge_index = edge_index, y = encoded_cls)
-        pyg_data.append(data)
-        dpr_data.append(Pyg2Dpr(data))
-        taskcla.append((task,selected_cls.size()[0]))
-    return dpr_data, pyg_data, taskcla
+#     dataset = dataset[0]
+#     labels = dataset.y
+#     features = dataset.x
+#     scaler = StandardScaler()
+#     scaler.fit(features)
+#     features = torch.tensor(scaler.transform(features))
+#     num_cls = np.unique(labels).shape[0]
+#     cls_idx = np.arange(num_cls)
+#     if shuffle:
+#         random.shuffle(cls_idx)
+#     cls_idx = torch.LongTensor(cls_idx)
+#     pyg_data = []
+#     dpr_data = []
+#     taskcla = []
+#     num_task = 5
+#     for task in range(num_task):
+#         selected_cls = cls_idx[task*(num_cls//num_task):(task+1)*(num_cls//num_task)]
+#         condition = torch.BoolTensor([i in selected_cls for i in labels])
+#         selected_mask = torch.where(condition, torch.tensor(1), torch.tensor(0)).bool()
+#         edge_index, _ = subgraph(selected_mask, dataset.edge_index, relabel_nodes = True)
+#         # print(selected_mask)
+#         # print(selected_mask.nonzero().flatten().size())
+#         # print(edge_index)
+#         le = LabelEncoder()
+#         le.fit(labels[selected_mask])
+#         encoded_cls = torch.LongTensor(le.transform(labels[selected_mask]))
+#         # print(encoded_cls)
+#         # print(encoded_cls.size())
+#         # print(features[selected_mask].size())
+#         data = Data(x = features[selected_mask], edge_index = edge_index, y = encoded_cls)
+#         pyg_data.append(data)
+#         dpr_data.append(Pyg2Dpr(data))
+#         taskcla.append((task,selected_cls.size()[0]))
+#     return dpr_data, pyg_data, taskcla
 
-class Pyg2Dpr(Dataset):
-    def __init__(self, pyg_data, **kwargs):
-        try:
-            splits = pyg_data.get_idx_split()
-        except:
-            pass
+# class Pyg2Dpr(Dataset):
+#     def __init__(self, pyg_data, **kwargs):
+#         try:
+#             splits = pyg_data.get_idx_split()
+#         except:
+#             pass
 
-        # dataset_name = pyg_data.name
-        dataset_name = ''
-        # pyg_data = pyg_data[0]
-        n = pyg_data.num_nodes
+#         # dataset_name = pyg_data.name
+#         dataset_name = ''
+#         # pyg_data = pyg_data[0]
+#         n = pyg_data.num_nodes
 
-        if dataset_name == 'ogbn-arxiv': # symmetrization
-            pyg_data.edge_index = to_undirected(pyg_data.edge_index, pyg_data.num_nodes)
+#         if dataset_name == 'ogbn-arxiv': # symmetrization
+#             pyg_data.edge_index = to_undirected(pyg_data.edge_index, pyg_data.num_nodes)
 
-        self.adj = sp.csr_matrix((np.ones(pyg_data.edge_index.shape[1]),
-            (pyg_data.edge_index[0], pyg_data.edge_index[1])), shape=(n, n))
+#         self.adj = sp.csr_matrix((np.ones(pyg_data.edge_index.shape[1]),
+#             (pyg_data.edge_index[0], pyg_data.edge_index[1])), shape=(n, n))
 
-        self.features = pyg_data.x.numpy()
-        self.labels = pyg_data.y.numpy()
+#         self.features = pyg_data.x.numpy()
+#         self.labels = pyg_data.y.numpy()
 
-        if len(self.labels.shape) == 2 and self.labels.shape[1] == 1:
-            self.labels = self.labels.reshape(-1) # ogb-arxiv needs to reshape
+#         if len(self.labels.shape) == 2 and self.labels.shape[1] == 1:
+#             self.labels = self.labels.reshape(-1) # ogb-arxiv needs to reshape
 
-        if hasattr(pyg_data, 'train_mask'):
-            # for fixed split
-            self.idx_train = mask_to_index(pyg_data.train_mask, n)
-            self.idx_val = mask_to_index(pyg_data.val_mask, n)
-            self.idx_test = mask_to_index(pyg_data.test_mask, n)
-            self.name = 'Pyg2Dpr'
-        else:
-            try:
-                # for ogb
-                self.idx_train = splits['train']
-                self.idx_val = splits['valid']
-                self.idx_test = splits['test']
-                self.name = 'Pyg2Dpr'
-            except:
-                # for other datasets
-                self.idx_train, self.idx_val, self.idx_test = get_train_val_test(
-                        nnodes=n, val_size=0.1, test_size=0.3, stratify=self.labels)
+#         if hasattr(pyg_data, 'train_mask'):
+#             # for fixed split
+#             self.idx_train = mask_to_index(pyg_data.train_mask, n)
+#             self.idx_val = mask_to_index(pyg_data.val_mask, n)
+#             self.idx_test = mask_to_index(pyg_data.test_mask, n)
+#             self.name = 'Pyg2Dpr'
+#         else:
+#             try:
+#                 # for ogb
+#                 self.idx_train = splits['train']
+#                 self.idx_val = splits['valid']
+#                 self.idx_test = splits['test']
+#                 self.name = 'Pyg2Dpr'
+#             except:
+#                 # for other datasets
+#                 self.idx_train, self.idx_val, self.idx_test = get_train_val_test(
+#                         nnodes=n, val_size=0.1, test_size=0.3, stratify=self.labels)
 
 
-def mask_to_index(index, size):
-    all_idx = np.arange(size)
-    return all_idx[index]
+# def mask_to_index(index, size):
+#     all_idx = np.arange(size)
+#     return all_idx[index]
 
-def index_to_mask(index, size):
-    mask = torch.zeros((size, ), dtype=torch.bool)
-    mask[index] = 1
-    return mask
+# def index_to_mask(index, size):
+#     mask = torch.zeros((size, ), dtype=torch.bool)
+#     mask[index] = 1
+#     return mask

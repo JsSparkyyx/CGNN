@@ -1,6 +1,7 @@
 import torch
 from tqdm import trange
 from sklearn.metrics import accuracy_score, f1_score
+import numpy as np
 
 class Manager(torch.nn.Module):
     def __init__(self,
@@ -58,6 +59,7 @@ class Manager(torch.nn.Module):
             else:
                 fisher[n] = 0*p.data
                 params[n] = 0*p.data
+        self.zero_grad()
         return fisher, params
 
     def train_with_eval(self, g, features, task, labels, train_mask, val_mask, args):
@@ -67,14 +69,14 @@ class Manager(torch.nn.Module):
             self.zero_grad()
             logits = self.forward(g, features, task)
             loss = self.ce(logits[train_mask],labels[train_mask])
-            loss_ewc = 0
             if task != 0:
+                loss_ewc = 0
                 for t in range(task):
                     for n, p in self.named_parameters():
                         l = self.fisher[t][n]
                         l = l * (p - self.params[t][n]).pow(2)
                         loss_ewc += l.sum()
-            loss = loss + self.lamb_full*loss_ewc
+                loss = loss + self.lamb_full*loss_ewc
             loss.backward()
             self.opt.step()
 
@@ -96,14 +98,14 @@ class Manager(torch.nn.Module):
                 self.zero_grad()
                 logits = self.forward(blocks, features[seed_nodes], task, mini_batch = True)
                 loss = self.ce(logits,labels[output_nodes])
-                loss_ewc = 0
                 if task != 0:
+                    loss_ewc = 0
                     for t in range(task):
                         for n, p in self.named_parameters():
                             l = self.fisher[t][n]
                             l = l * (p - self.params[t][n]).pow(2)
                             loss_ewc += l.sum()
-                loss = loss + self.lamb_mini*loss_ewc
+                    loss = loss + self.lamb_mini*loss_ewc
                 loss.backward()
                 self.opt.step()
 
@@ -119,6 +121,7 @@ class Manager(torch.nn.Module):
 
     @torch.no_grad()
     def evaluation(self, g, features, task, labels, val_mask):
+        self.eval()
         logits = self.forward(g, features, task)
         prob, prediction = torch.max(logits, dim=1)
         prediction = prediction[val_mask].cpu().numpy()

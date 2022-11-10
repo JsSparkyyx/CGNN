@@ -1,6 +1,7 @@
 import torch
 from tqdm import trange
 from sklearn.metrics import accuracy_score, f1_score
+import numpy as np
 
 class Manager(torch.nn.Module):
     def __init__(self,
@@ -67,6 +68,7 @@ class Manager(torch.nn.Module):
 
     @torch.no_grad()
     def evaluation(self, g, features, task, labels, val_mask):
+        self.eval()
         logits = self.forward(g, features, task)
         prob, prediction = torch.max(logits, dim=1)
         prediction = prediction[val_mask].cpu().numpy()
