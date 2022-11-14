@@ -45,7 +45,7 @@ def init_parameters():
     parser.add_argument('--aggregator_type', type=str, choices=['mean','pool','lstm','gcn'], default='mean')
 
     # parameters for EWC
-    parser.add_argument('--ewc_lamb_full', type=int, default=10000000)
+    parser.add_argument('--ewc_lamb_full', type=int, default=1000)
     parser.add_argument('--ewc_lamb_mini', type=int, default=1000000)
 
     # parameters for GEM

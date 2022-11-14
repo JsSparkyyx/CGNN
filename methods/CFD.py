@@ -18,6 +18,7 @@ class Manager(torch.nn.Module):
         self.lamb_full = args.ewc_lamb_full
         self.lamb_mini = args.ewc_lamb_mini
         self.class_incremental = args.class_incremental
+        self.projector = torch.nn.Linear(in_feat,in_feat)
 
         if self.class_incremental:
             self.predict = torch.nn.ModuleList()
@@ -36,45 +37,18 @@ class Manager(torch.nn.Module):
         else:
             logits = self.predict(h)
 
-        return logits
-
-    def calculate_fisher(self, g, features, task, labels, mask):
-        self.train()
-        self.zero_grad()
-
-        fisher = {}
-        params = {}
-
-        logits = self.forward(g, features, task)
-        loss = self.ce(logits[mask],labels[mask])
-        loss.backward()
-
-        for n,p in self.named_parameters():
-            if p.grad is not None:
-                pd = p.data.clone()
-                pg = p.grad.data.clone().pow(2)
-                fisher[n] = pg
-                params[n] = pd
-            else:
-                fisher[n] = 0*p.data
-                params[n] = 0*p.data
-        return fisher, params
+        return logits, h, self.projector(h)
 
     def train_with_eval(self, g, features, task, labels, train_mask, val_mask, args):
         self.train()
 
         for epoch in trange(args.epochs, leave=False):
             self.zero_grad()
-            logits = self.forward(g, features, task)
+            logits, vec, adapted_vec = self.forward(g, features, task)
             loss = self.ce(logits[train_mask],labels[train_mask])
-            loss_ewc = 0
             if task != 0:
-                for t in range(task):
-                    for n, p in self.named_parameters():
-                        l = self.fisher[t][n]
-                        l = l * (p - self.params[t][n]).pow(2)
-                        loss_ewc += l.sum()
-            loss = loss + self.lamb_full*loss_ewc
+                loss_distill = self.compute_distill_loss(vec, adapted_vec)
+                loss = loss + loss_distill
             loss.backward()
             self.opt.step()
 
@@ -83,27 +57,17 @@ class Manager(torch.nn.Module):
                 print()
                 print('Val, Epoch:{}, Loss:{}, ACC:{}, Micro-F1:{}, Macro-F1:{}'.format(epoch, loss.item(), acc, mif1, maf1))
 
-        fisher, params = self.calculate_fisher(g, features, task, labels, train_mask)
-        self.current_task = task
-        self.fisher[self.current_task] = fisher
-        self.params[self.current_task] = params
-
     def batch_train_with_eval(self, dataloader, g, features, task, labels, train_mask, val_mask, args):
         self.train()
 
         for epoch in trange(args.epochs, leave=False):
             for seed_nodes, output_nodes, blocks in dataloader:
                 self.zero_grad()
-                logits = self.forward(blocks, features[seed_nodes], task, mini_batch = True)
+                logits, vec, adapted_vec = self.forward(blocks, features[seed_nodes], task, mini_batch = True)
                 loss = self.ce(logits,labels[output_nodes])
-                loss_ewc = 0
                 if task != 0:
-                    for t in range(task):
-                        for n, p in self.named_parameters():
-                            l = self.fisher[t][n]
-                            l = l * (p - self.params[t][n]).pow(2)
-                            loss_ewc += l.sum()
-                loss = loss + self.lamb_mini*loss_ewc
+                    loss_distill = self.compute_distill_loss(vec, adapted_vec)
+                    loss = loss + loss_distill
                 loss.backward()
                 self.opt.step()
 
@@ -112,15 +76,15 @@ class Manager(torch.nn.Module):
                 print()
                 print('Val, Epoch:{}, Loss:{}, ACC:{}, Micro-F1:{}, Macro-F1:{}'.format(epoch, loss.item(), acc, mif1, maf1))
 
-        fisher, params = self.calculate_fisher(g, features, task, labels, train_mask)
-        self.current_task = task
-        self.fisher[self.current_task] = fisher
-        self.params[self.current_task] = params
+    def compute_distill_loss(v1, v2):
+        loss = torch.matmul(v1,v2)
+        torch.nn.functional.cosine_similarity()
+        return loss
 
     @torch.no_grad()
     def evaluation(self, g, features, task, labels, val_mask):
         self.eval()
-        logits = self.forward(g, features, task)
+        logits, v1, v2 = self.forward(g, features, task)
         prob, prediction = torch.max(logits, dim=1)
         prediction = prediction[val_mask].cpu().numpy()
         labels = labels[val_mask].cpu().numpy()
