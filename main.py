@@ -1,10 +1,12 @@
 from utils import *
 from init_parameters import init_parameters
+from torch.utils.tensorboard import SummaryWriter
 from data.load_data import *
 import importlib
 
 # python main.py --method CR --arch GAT --dataset reddit --manner full_batch --seed 0 --epoch 3000 --lr 0.001 --weight_decay 5e-4
 def main(args):
+    writer = SummaryWriter(f'./results/runs/lamb_distill_{args.lamb_distill}_{args.seed}/metrics')
     data, taskcla, in_feat = load_dataset(args.dataset, args.device)
     arc = importlib.import_module(f'models.{args.arch}')
     if args.arch == 'GAT':
@@ -40,7 +42,11 @@ def main(args):
                 g, features, _, labels, train_mask, val_mask, test_mask = data[previous].retrieve_data()
                 acc, mif1, maf1 = manager.evaluation(g, features, previous, labels, test_mask)
                 print('Stage:{} Task:{}, ACC:{}, Micro-F1:{}, Macro-F1:{}'.format(task, previous, acc, mif1, maf1))
+                writer.add_scalar(f'{args.method}/{previous}/acc',acc,task)
+                # writer.add_scalar(f'{args.method}/{previous}/mif1',mif1,task)
+                # writer.add_scalar(f'{args.method}/{previous}/maf1',maf1,previous)
                 results.loc[len(results.index)] = [task,previous,acc,mif1,maf1,args.seed]
+            writer.add_scalar(f'{args.method}/mean_acc',results[results['stage'] == task]['accuracy'].mean(),task)
     elif args.manner == 'mini_batch':
         for task in range(args.num_tasks):
             print('Train task:{}'.format(task))

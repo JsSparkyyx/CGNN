@@ -19,7 +19,7 @@ class Manager(torch.nn.Module):
         self.lamb_distill = args.lamb_distill
         self.class_incremental = args.class_incremental
         self.frozen_encoder = None
-        self.writer = SummaryWriter(f'./results/runs/lamb_distill_{self.lamb_distill}')
+        self.writer = SummaryWriter(f'./results/runs/lamb_distill_{self.lamb_distill}_{args.seed}/loss')
         self.projector = torch.nn.Linear(in_feat,in_feat)
 
         if self.class_incremental:
