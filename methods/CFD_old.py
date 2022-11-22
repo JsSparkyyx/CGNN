@@ -18,7 +18,7 @@ class Manager(torch.nn.Module):
         self.current_task = 0
         self.lamb_distill = args.lamb_distill
         self.class_incremental = args.class_incremental
-        self.frozen_encoder = []
+        self.frozen_encoder = None
         self.writer = SummaryWriter(f'./results/runs/lamb_distill_{self.lamb_distill}_{args.seed}/loss')
         self.projector = torch.nn.Linear(in_feat,in_feat)
 
@@ -27,23 +27,23 @@ class Manager(torch.nn.Module):
             for task, n_class, _ in taskcla:
                 self.predict.append(torch.nn.Linear(in_feat,n_class))
         else:
-            self.predict = torch.nn.Linear(in_feat,taskcla)
+            self.predict = torch.nn.ModuleList()
+            for task in range(args.num_tasks):
+                self.predict.append(torch.nn.Linear(in_feat,taskcla))
 
         self.ce = torch.nn.CrossEntropyLoss()
-        self.opt = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay)
+        self.encoder_opt = torch.optim.Adam(self.arch.parameters(), lr=lr, weight_decay=weight_decay)
+        self.head_opts = [torch.optim.Adam(self.predict[task].parameters(), lr=lr, weight_decay=weight_decay) for task in range(args.num_tasks)]
     
     def forward(self, g, features, task, mini_batch = False):
         h = self.arch(g, features, mini_batch)
-        if self.class_incremental:
-            logits = self.predict[task](h)
-        else:
-            logits = self.predict(h)
+        logits = self.predict[task](h)
 
         return logits, h, self.projector(h)
 
     @torch.no_grad()
     def frozen_forward(self, g, features, task, mini_batch = False):
-        return self.frozen_encoder[task](g, features, mini_batch)
+        return self.frozen_encoder(g, features, mini_batch)
 
     def train_with_eval(self, g, features, task, labels, train_mask, val_mask, args):
         self.train()
@@ -54,26 +54,34 @@ class Manager(torch.nn.Module):
                 logits, vec, adapted_vec = self.forward(g, features, task)
                 loss = self.ce(logits[train_mask],labels[train_mask])
                 if task != 0:
-                    loss_distill = 0
-                    for previous in range(task - 1):
-                        frozen_vec = self.frozen_forward(g, features, previous)
-                        v1 = F.normalize(frozen_vec)
-                        v2 = F.normalize(adapted_vec)
-                        loss_distill += self.compute_distill_loss(v1, v2)
+                    frozen_vec = self.frozen_forward(g, features, task)
+                    v1, v2 = F.normalize(frozen_vec), F.normalize(adapted_vec)
+                    loss_distill = self.compute_distill_loss(v1, v2)
                     loss = loss + loss_distill*self.lamb_distill
                     tr.set_description(f"distill loss: {self.lamb_distill*loss_distill}")
                     self.writer.add_scalar('CFD/distill_loss',loss_distill*self.lamb_distill,epoch+args.epochs*task)
                 loss.backward()
-                self.opt.step()
+                self.encoder_opt.step()
+                self.head_opts[task].step()
                 self.writer.add_scalar('CFD/total_loss',loss.item(),epoch+args.epochs*task)
+
+                # if task != 0:
+                #     self.zero_grad()
+                #     teacher_logits = F.softmax(self.predict[task - 1](frozen_vec),dim=-1)
+                #     with torch.no_grad():
+                #         _, vec, _ = self.forward(g, features, task)
+                #     logits = F.softmax(self.predict[task - 1](vec),dim=-1)
+                #     match_loss = self.compute_distill_loss(teacher_logits, logits)
+                #     match_loss.backward()
+                #     self.head_opts[task - 1].step()
+                #     self.writer.add_scalar('CFD/match_loss',match_loss,epoch+args.epochs*task)
+                    
                 if epoch % 50 == 0:
                     acc, mif1, maf1 = self.evaluation(g, features, task, labels, val_mask)
                     print()
                     print('Val, Epoch:{}, Loss:{}, ACC:{}, Micro-F1:{}, Macro-F1:{}'.format(epoch, loss.item(), acc, mif1, maf1))
-        frozen_encoder = copy.deepcopy(self.arch)
-        frozen_encoder.requires_grad_(False)
-        self.frozen_encoder.append(frozen_encoder)
-        self.projector.reset_parameters()
+        self.frozen_encoder = copy.deepcopy(self.arch)
+        self.frozen_encoder.requires_grad_(False)
 
     def batch_train_with_eval(self, dataloader, g, features, task, labels, train_mask, val_mask, args):
         self.train()
@@ -93,7 +101,6 @@ class Manager(torch.nn.Module):
                 acc, mif1, maf1 = self.evaluation(g, features, task, labels, val_mask)
                 print()
                 print('Val, Epoch:{}, Loss:{}, ACC:{}, Micro-F1:{}, Macro-F1:{}'.format(epoch, loss.item(), acc, mif1, maf1))
-
     def compute_distill_loss(self, v1, v2):
         return F.mse_loss(v1, v2)
 
@@ -108,3 +115,4 @@ class Manager(torch.nn.Module):
         mif1 = f1_score(labels, prediction, average='micro')
         maf1 = f1_score(labels, prediction, average='macro')
         return round(acc*100,2), round(mif1*100,2), round(maf1*100,2)
+

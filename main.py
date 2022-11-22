@@ -22,7 +22,8 @@ def main(args):
         manager = importlib.import_module(f'methods.{args.method}')
         manager = manager.Manager(args.gcn_hidden, taskcla, arc, args).to(args.device)
     elif args.arch == 'HTG':
-        data, meta_path = data
+        data, meta_path, indexes = data
+        args.indexes = indexes
         arc = arc.NET(meta_path, in_feat, num_hidden = args.htg_hidden, heads = args.htg_head, num_layers = args.htg_layer)
         manager = importlib.import_module(f'methods.{args.method}')
         manager = manager.Manager(args.htg_hidden*args.htg_head, taskcla, arc, args).to(args.device)

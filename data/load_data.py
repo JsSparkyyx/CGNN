@@ -157,7 +157,7 @@ def load_cfd(device = 'cuda:0', shuffle = True):
         val_mask = get_binary_mask(num_nodes, val_idx)
         test_mask = get_binary_mask(num_nodes, test_idx)
         data.append(GraphData(g, features, labels, labels, train_mask, val_mask, test_mask, device))
-    return (data, [['tc', 'ct'], ['th', 'ht'], ['tm', 'mt']]), 2, features.shape[1]
+    return (data, [['tc', 'ct'], ['th', 'ht'], ['tm', 'mt']], indexes), 2, features.shape[1]
         
 # g, features, labels = load_cora()
 # data, taskcla, in_feat = split_tasks(g, features, labels)
