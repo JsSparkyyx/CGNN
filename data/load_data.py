@@ -101,8 +101,10 @@ def load_cfd(device = 'cuda:0', shuffle = True):
     regions = pickle.load(open(path+'/data.pickle','rb'))
     data = []
     indexes = list(regions.keys())
-    # if shuffle:
-    #     random.shuffle(indexes)
+    # print(regions.keys())
+    if shuffle:
+        random.shuffle(indexes)
+    print(indexes)
     for task, index in enumerate(indexes):
         region = regions[index]
         card2idx = {}

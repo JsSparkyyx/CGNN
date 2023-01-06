@@ -17,17 +17,24 @@ class Manager(torch.nn.Module):
         self.params = {}
         self.lamb_full = args.mas_lamb_full
         self.lamb_mini = args.mas_lamb_mini
+        self.class_incremental = args.class_incremental
 
-        self.predict = torch.nn.ModuleList()
-        for task, n_class, _ in taskcla:
-            self.predict.append(torch.nn.Linear(in_feat,n_class))
+        if self.class_incremental:
+            self.predict = torch.nn.ModuleList()
+            for task, n_class, _ in taskcla:
+                self.predict.append(torch.nn.Linear(in_feat,n_class))
+        else:
+            self.predict = torch.nn.Linear(in_feat,taskcla)
 
         self.ce = torch.nn.CrossEntropyLoss()
         self.opt = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay)
     
     def forward(self, g, features, task, mini_batch = False):
         h = self.arch(g, features, mini_batch)
-        logits = self.predict[task](h)
+        if self.class_incremental:
+            logits = self.predict[task](h)
+        else:
+            logits = self.predict(h)
 
         return logits
 
@@ -60,14 +67,14 @@ class Manager(torch.nn.Module):
             self.zero_grad()
             logits = self.forward(g, features, task)
             loss = self.ce(logits[train_mask],labels[train_mask])
-            loss_ewc = 0
+            loss_mas = 0
             if task != 0:
                 for t in range(task):
                     for n, p in self.named_parameters():
                         l = self.fisher[t][n]
                         l = l * (p - self.params[t][n]).pow(2)
-                        loss_ewc += l.sum()
-            loss = loss + self.lamb_full*loss_ewc
+                        loss_mas += l.sum()
+            loss = loss + self.lamb_full*loss_mas
             loss.backward()
             self.opt.step()
 
@@ -89,14 +96,14 @@ class Manager(torch.nn.Module):
                 self.zero_grad()
                 logits = self.forward(blocks, features[seed_nodes], task, mini_batch = True)
                 loss = self.ce(logits,labels[output_nodes])
-                loss_ewc = 0
+                loss_mas = 0
                 if task != 0:
                     for t in range(task):
                         for n, p in self.named_parameters():
                             l = self.fisher[t][n]
                             l = l * (p - self.params[t][n]).pow(2)
-                            loss_ewc += l.sum()
-                loss = loss + self.lamb_mini*loss_ewc
+                            loss_mas += l.sum()
+                loss = loss + self.lamb_mini*loss_mas
                 loss.backward()
                 self.opt.step()
 

@@ -58,5 +58,10 @@ def init_parameters():
     parser.add_argument('--mas_lamb_full', type=int, default=50000)
     parser.add_argument('--mas_lamb_mini', type=int, default=1000)
 
+    # parameters for DERPP
+    parser.add_argument('--derpp_alpha', type=int, default=50000)
+    parser.add_argument('--derpp_beta', type=int, default=1000)
+    parser.add_argument('--derpp_buffer_size', type=int, default=1000)
+
     args = parser.parse_args()
     return args
